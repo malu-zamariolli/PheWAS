@@ -1,0 +1,11 @@
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - ca-certificates=2024.7.4
+  - libcxx
+  - libjpeg-turbo
+  - libzlib
+  - openssl
+  - qpdf=11.9.1

@@ -1,0 +1,27 @@
+#--------- Date: 
+# -------- Name: 
+
+# Set name of run:
+phewas: 
+
+# Number of traits per chunk 
+chunks: 50
+#number of chunks considering above - ceiling(Ntraits/chunk)
+n_bin: 3
+n_ord: 5
+n_cont: 3
+n_uno: 1
+
+# SNP model in plink
+  # For additive - A
+snp_model: A
+
+#------ Paths to input files-------#
+PlinkFiles: "path_to_file"  # File with IDs that passed QC and apoe variant
+Traits: "path_to_file" 
+CodeBook: "path_to_file" 
+Traits_raw: "path_to_file"
+
+# Number of SNPs 
+n_snps: 1
+

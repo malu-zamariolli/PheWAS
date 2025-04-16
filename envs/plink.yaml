@@ -1,0 +1,6 @@
+channels:
+  - conda-forge/osx-64
+  - bioconda/osx-64
+  - defaults/osx-64
+dependencies:
+  - plink=1.90b6.21
