@@ -87,20 +87,21 @@ df.nominal <- df.pvalue[df.pvalue$p.value < 0.05, ]
 ####################################################
 ##### Non-parametric testing - Linear Regression
 ##################################################
-# For linear regression, we'll use Kruskall Wallis
 print("Starting linear regression - Kruskall Wallis")
 
 df.linear <- df.nominal[df.nominal$method %in% "LinearRegression", ]
 
 kw.list <- list()
-for (i in 1:nrow(df.linear)) {
-  pheno <- df.linear[i, "Pheno"]
-  snp <- df.linear[i, "term"]
-  formula <- as.formula(paste(pheno, "~", "as.factor(", snp, ")"))
-  kw.test <- tryCatch({
-    broom::tidy(kruskal.test(formula, data = df.raw))
+
+if (nrow(df.linear) > 0) {
+  for (i in 1:nrow(df.linear)) {
+    pheno <- df.linear[i, "Pheno"]
+    snp <- df.linear[i, "term"]
+    formula <- as.formula(paste(pheno, "~", "as.factor(", snp, ")"))
+    kw.test <- tryCatch({
+      broom::tidy(kruskal.test(formula, data = df.raw))
     }, error = function(e) {
-        # Return dataframe with error
+      # Return dataframe with error
         data.frame(
             statistic = NA,
             p.value = NA,
@@ -112,18 +113,19 @@ for (i in 1:nrow(df.linear)) {
   kw.test$SNP <- snp
   kw.test$Group <- "full"
   kw.list[[i]] <- kw.test
+}    
+  df.linear.kw <- do.call(rbind, kw.list)
+  linear.confirmed <- df.linear.kw[df.linear.kw$p.value < 0.05, ]
+} else {
+  df.linear.kw <- data.frame()
+  linear.confirmed <- data.frame()
 }
-
-df.linear.kw <- do.call(rbind, kw.list)
-
-linear.confirmed <- df.linear.kw[df.linear.kw$p.value < 0.05, ]
 
 rm(kw.list, pheno, snp, kw.test, formula, i, df.linear)
 
 ####################################################
 ##### Non-parametric testing - Logistic Regression
 ##################################################
-# Cochran Armitage to consider ordinal nature of additive model
 print("Starting logistic regression - Cochran Armitage")
 
 df.logistic <- df.nominal[df.nominal$method %in% "LogisticRegression", ]
@@ -133,57 +135,58 @@ ca.list <- list()
 # List for Fisher
 fi.log.list <- list()
 
-for (i in 1:nrow(df.logistic)) {
-  pheno <- df.logistic[i, "Pheno"]
-  snp <- df.logistic[i, "term"]
-  table.contigency <- table(df.raw[[pheno]], df.raw[[snp]])
-  ca.test <- tryCatch({
-    broom::tidy(DescTools::CochranArmitageTest(table.contigency))
-    }, error = function(e) {
-        # Return dataframe with error
-        data.frame(
-            statistic = NA,
-            p.value = NA,
-            parameter = NA,
-            method = "error", 
-            alternative = "error"
-        )
-    })
-  ca.test$Pheno <- pheno
-  ca.test$SNP <- snp
-  ca.test$Group <- "full"
-  ca.list[[i]] <- ca.test
-  # Fisher 
-    fi.log <- tryCatch({
-    broom::tidy(fisher.test(table.contigency))
-    }, error = function(e) {
-        # Return dataframe with error
-        data.frame(
-            p.value = NA,
-            method = "error", 
-            alternative = "error"
-        )
-    })
-  fi.log <- fi.log[, c("p.value", "method", "alternative")]
-  fi.log$Pheno <- pheno
-  fi.log$SNP <- snp
-  fi.log$Group <- "full"
-  fi.log.list[[i]] <- fi.log
+if (nrow(df.logistic) > 0) {
+  for (i in 1:nrow(df.logistic)) {
+    pheno <- df.logistic[i, "Pheno"]
+    snp <- df.logistic[i, "term"]
+    table.contigency <- table(df.raw[[pheno]], df.raw[[snp]])
+    ca.test <- tryCatch({
+      broom::tidy(DescTools::CochranArmitageTest(table.contigency))
+      }, error = function(e) {
+          # Return dataframe with error
+          data.frame(
+              statistic = NA,
+              p.value = NA,
+              parameter = NA,
+              method = "error", 
+              alternative = "error"
+          )
+      })
+    ca.test$Pheno <- pheno
+    ca.test$SNP <- snp
+    ca.test$Group <- "full"
+    ca.list[[i]] <- ca.test
+    # Fisher 
+      fi.log <- tryCatch({
+      broom::tidy(fisher.test(table.contigency))
+      }, error = function(e) {
+          # Return dataframe with error
+          data.frame(
+              p.value = NA,
+              method = "error", 
+              alternative = "error"
+          )
+      })
+    fi.log <- fi.log[, c("p.value", "method", "alternative")]
+    fi.log$Pheno <- pheno
+    fi.log$SNP <- snp
+    fi.log$Group <- "full"
+    fi.log.list[[i]] <- fi.log
+  }
+  df.logistic.ca <- do.call(rbind, ca.list)
+  df.logistic.fi <- do.call(rbind, fi.log.list)
+  logistic.confirmed <- df.logistic.ca[df.logistic.ca$p.value < 0.05, ]
+} else {
+  df.logistic.ca <- data.frame()
+  df.logistic.fi <- data.frame()
+  logistic.confirmed <- data.frame()
 }
-
-
-df.logistic.ca <- do.call(rbind, ca.list)
-
-df.logistic.fi <- do.call(rbind, fi.log.list)
-
-logistic.confirmed <- df.logistic.ca[df.logistic.ca$p.value < 0.05, ]
 
 rm(ca.list, pheno, snp, ca.test,i, df.logistic, table.contigency, fi.log.list)
 
 ####################################################
 ##### Non-parametric testing - Multinomial Regression
 ##################################################
-# Cochran Armitage to consider ordinal nature of additive model
 print("Starting Multinomial regression - Cochran Armitage")
 
 df.mult <- df.nominal[df.nominal$method %in% "MultiLogReg", ]
@@ -202,52 +205,56 @@ ca.list <- list()
 # Fisher list
 fi.mult.list <- list()
 
-for (i in 1:nrow(df.mult)) {
-  pheno <- df.mult[i, "Pheno"]
-  snp <- df.mult[i, "term"]
-  group <- df.mult[i, "y.level"]
-  # Filter groups of interest
-  df.test <- df.raw[, c(pheno, snp)]
-  ref_group <- min(unique(df.test[[pheno]]), na.rm = TRUE)
-  df.test <- df.test[df.test[[pheno]] %in% c(ref_group, group), ]
-  # Table and test
-  table.contigency <- table(df.test[[pheno]], df.test[[snp]])
-  ca.test <- tryCatch({
-    broom::tidy(DescTools::CochranArmitageTest(table.contigency))
-  }, error = function(e) {
-    data.frame(
-        statistic = NA,
-        p.value = NA, 
-        parameter = NA,
-        method = "error",
-        alternative = "error"
-    )
-  })
-  ca.test$Pheno <- pheno
-  ca.test$SNP <- snp
-  ca.test$Group <- group
-  ca.list[[i]] <- ca.test
-  # Fisher
-  fi.mult <- tryCatch({
-    broom::tidy(fisher.test(table.contigency))
-  }, error = function(e) {
-    data.frame(
-        p.value = NA,
-        method = "error", 
-        alternative = "error"
-    )
-  })
-  fi.mult <- fi.mult[, c("p.value", "method", "alternative")]
-  fi.mult$Pheno <- pheno
-  fi.mult$SNP <- snp
-  fi.mult$Group <- group
-  fi.mult.list[[i]] <- fi.mult
+if (nrow(df.mult) > 0) {
+  for (i in 1:nrow(df.mult)) {
+    pheno <- df.mult[i, "Pheno"]
+    snp <- df.mult[i, "term"]
+    group <- df.mult[i, "y.level"]
+    # Filter groups of interest
+    df.test <- df.raw[, c(pheno, snp)]
+    ref_group <- min(unique(df.test[[pheno]]), na.rm = TRUE)
+    df.test <- df.test[df.test[[pheno]] %in% c(ref_group, group), ]
+    # Table and test
+    table.contigency <- table(df.test[[pheno]], df.test[[snp]])
+    ca.test <- tryCatch({
+      broom::tidy(DescTools::CochranArmitageTest(table.contigency))
+    }, error = function(e) {
+      data.frame(
+          statistic = NA,
+          p.value = NA, 
+          parameter = NA,
+          method = "error",
+          alternative = "error"
+      )
+    })
+    ca.test$Pheno <- pheno
+    ca.test$SNP <- snp
+    ca.test$Group <- group
+    ca.list[[i]] <- ca.test
+    # Fisher
+    fi.mult <- tryCatch({
+      broom::tidy(fisher.test(table.contigency))
+    }, error = function(e) {
+      data.frame(
+          p.value = NA,
+          method = "error", 
+          alternative = "error"
+      )
+    })
+    fi.mult <- fi.mult[, c("p.value", "method", "alternative")]
+    fi.mult$Pheno <- pheno
+    fi.mult$SNP <- snp
+    fi.mult$Group <- group
+    fi.mult.list[[i]] <- fi.mult
+  }
+  df.mult.ca <- do.call(rbind, ca.list)
+  df.mult.fi <- do.call(rbind, fi.mult.list)
+  multinomial.confirmed <- df.mult.ca[df.mult.ca$p.value < 0.05, ]
+} else {
+  df.mult.ca <- data.frame()
+  df.mult.fi <- data.frame()
+  multinomial.confirmed <- data.frame()
 }
-
-df.mult.ca <- do.call(rbind, ca.list)
-df.mult.fi <- do.call(rbind, fi.mult.list)
-
-multinomial.confirmed <- df.mult.ca[df.mult.ca$p.value < 0.05, ]
 
 rm(ca.list, pheno, snp, ca.test,i, df.mult, table.contigency, df.test, group, fi.mult.list)
 
@@ -264,45 +271,49 @@ jt.list <- list()
 # Fisher list 
 fi.ord.list <- list()
 
-for (i in 1:nrow(df.ord)) {
-  pheno <- df.ord[i, "Pheno"]
-  snp <- df.ord[i, "term"]
-  jt.test <- tryCatch({
-    broom::tidy(jonckheere.test(df.raw[[pheno]], df.raw[[snp]], nperm = 1000))
-  }, error = function(e) {
-    data.frame(
-        statistic = NA,
-        p.value = NA,
-        method = "error", 
-        alternative = "error"
-    )
-  })
-  jt.test$Pheno <- pheno
-  jt.test$SNP <- snp
-  jt.test$Group <- "full"
-  jt.list[[i]] <- jt.test
-  # Fisher
-  table.contigency <- table(df.raw[[pheno]], df.raw[[snp]])
-  fi.ord <- tryCatch({
-    broom::tidy(fisher.test(table.contigency, simulate.p.value = TRUE, B = 10000))
-  }, error = function(e) {
-    data.frame(
-        p.value = NA,
-        method = "error", 
-        alternative = "error"
-    )
-  })
-  fi.ord <- fi.ord[, c("p.value", "method", "alternative")]
-  fi.ord$Pheno <- pheno
-  fi.ord$SNP <- snp
-  fi.ord$Group <- "full"
-  fi.ord.list[[i]] <- fi.ord
+if (nrow(df.ord) > 0) {
+  for (i in 1:nrow(df.ord)) {
+    pheno <- df.ord[i, "Pheno"]
+    snp <- df.ord[i, "term"]
+    jt.test <- tryCatch({
+      broom::tidy(jonckheere.test(df.raw[[pheno]], df.raw[[snp]], nperm = 1000))
+    }, error = function(e) {
+      data.frame(
+          statistic = NA,
+          p.value = NA,
+          method = "error", 
+          alternative = "error"
+      )
+    })
+    jt.test$Pheno <- pheno
+    jt.test$SNP <- snp
+    jt.test$Group <- "full"
+    jt.list[[i]] <- jt.test
+    # Fisher
+    table.contigency <- table(df.raw[[pheno]], df.raw[[snp]])
+    fi.ord <- tryCatch({
+      broom::tidy(fisher.test(table.contigency, simulate.p.value = TRUE, B = 10000))
+    }, error = function(e) {
+      data.frame(
+          p.value = NA,
+          method = "error", 
+          alternative = "error"
+      )
+    })
+    fi.ord <- fi.ord[, c("p.value", "method", "alternative")]
+    fi.ord$Pheno <- pheno
+    fi.ord$SNP <- snp
+    fi.ord$Group <- "full"
+    fi.ord.list[[i]] <- fi.ord
+  }
+  df.ord.jt <- do.call(rbind, jt.list)
+  df.ord.fi <- do.call(rbind, fi.ord.list)
+  ordinal.confirmed <- df.ord.jt[df.ord.jt$p.value < 0.05, ]
+} else {
+  df.ord.jt <- data.frame()
+  df.ord.fi <- data.frame()
+  ordinal.confirmed <- data.frame()
 }
-
-df.ord.jt <- do.call(rbind, jt.list)
-df.ord.fi <- do.call(rbind, fi.ord.list)
-
-ordinal.confirmed <- df.ord.jt[df.ord.jt$p.value < 0.05, ]
 
 rm(jt.list, pheno, i, snp, jt.test, df.ord)
 

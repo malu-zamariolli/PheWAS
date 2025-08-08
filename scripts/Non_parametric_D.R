@@ -81,81 +81,86 @@ df.nominal <- df.pvalue[df.pvalue$p.value < 0.05, ]
 ####################################################
 ##### Non-parametric testing - Linear Regression
 ##################################################
-# For linear regression, we'll use Wilcoxon Rank Test
 print("Starting linear regression - Wilcoxon Rank Test")
 
 df.linear <- df.nominal[df.nominal$method %in% "LinearRegression", ]
 
 wt.list <- list()
-for (i in 1:nrow(df.linear)) {
-  pheno <- df.linear[i, "Pheno"]
-  snp <- df.linear[i, "term"]
-  formula <- as.formula(paste(pheno, "~", "as.factor(", snp, ")"))
-  wt.test <- tryCatch({
-    broom::tidy(wilcox.test(formula, na.action = na.omit, data = df.raw))
-    }, error = function(e) {
-        # Return dataframe with error
-        data.frame(
-            statistic = NA,
-            p.value = NA,
-            method = "error",
-            alternative = "error"
-        )
-    })
-  wt.test$Pheno <- pheno
-  wt.test$SNP <- snp
-  wt.test$Group <- "full"
-  wt.list[[i]] <- wt.test
+
+if (nrow(df.linear) > 0) {
+  for (i in 1:nrow(df.linear)) {
+    pheno <- df.linear[i, "Pheno"]
+    snp <- df.linear[i, "term"]
+    formula <- as.formula(paste(pheno, "~", "as.factor(", snp, ")"))
+    wt.test <- tryCatch({
+      broom::tidy(wilcox.test(formula, na.action = na.omit, data = df.raw))
+      }, error = function(e) {
+          # Return dataframe with error
+          data.frame(
+              statistic = NA,
+              p.value = NA,
+              method = "error",
+              alternative = "error"
+          )
+      })
+    wt.test$Pheno <- pheno
+    wt.test$SNP <- snp
+    wt.test$Group <- "full"
+    wt.list[[i]] <- wt.test
+  }
+  df.linear.wt <- do.call(rbind, wt.list)
+  linear.confirmed <- df.linear.wt[df.linear.wt$p.value < 0.05, ]
+} else {
+  df.linear.wt <- data.frame()
+  linear.confirmed <- data.frame()
 }
-
-df.linear.wt <- do.call(rbind, wt.list)
-
-linear.confirmed <- df.linear.wt[df.linear.wt$p.value < 0.05, ]
 
 rm(wt.list, pheno, snp, wt.test, formula, i, df.linear)
 
 ####################################################
 ##### Non-parametric testing - Logistic Regression
 ##################################################
-# Cochran Armitage to consider ordinal nature of additive model
 print("Starting logistic regression - Fisher's test")
 
 df.logistic <- df.nominal[df.nominal$method %in% "LogisticRegression", ]
 
 fi.list <- list()
-for (i in 1:nrow(df.logistic)) {
-  pheno <- df.logistic[i, "Pheno"]
-  snp <- df.logistic[i, "term"]
-  table.contigency <- table(df.raw[[pheno]], df.raw[[snp]])
-  fi.test <- tryCatch({
-    broom::tidy(fisher.test(table.contigency))
-    }, error = function(e) {
-        # Return dataframe with error
-        data.frame(
-            estimate = NA,
-            p.value = NA,
-            conf.low = NA,
-            conf.high = NA,
-            method = "error", 
-            alternative = "error"
-        )
-    })
-  fi.test$Pheno <- pheno
-  fi.test$SNP <- snp
-  fi.test$Group <- "full"
-  fi.list[[i]] <- fi.test
+
+if (nrow(df.logistic) > 0) {
+  for (i in 1:nrow(df.logistic)) {
+    pheno <- df.logistic[i, "Pheno"]
+    snp <- df.logistic[i, "term"]
+    table.contigency <- table(df.raw[[pheno]], df.raw[[snp]])
+    fi.test <- tryCatch({
+      broom::tidy(fisher.test(table.contigency))
+      }, error = function(e) {
+          # Return dataframe with error
+          data.frame(
+              estimate = NA,
+              p.value = NA,
+              conf.low = NA,
+              conf.high = NA,
+              method = "error", 
+              alternative = "error"
+          )
+      })
+    fi.test$Pheno <- pheno
+    fi.test$SNP <- snp
+    fi.test$Group <- "full"
+    fi.list[[i]] <- fi.test
+  }
+  df.logistic.fi <- do.call(rbind, fi.list)
+  logistic.confirmed <- df.logistic.fi[df.logistic.fi$p.value < 0.05, ]
+} else {
+  df.logistic.fi <- data.frame()
+  logistic.confirmed <- data.frame()
 }
-
-df.logistic.fi <- do.call(rbind, fi.list)
-
-logistic.confirmed <- df.logistic.fi[df.logistic.fi$p.value < 0.05, ]
 
 rm(fi.list, pheno, snp, fi.test, i, df.logistic, table.contigency)
 
 ####################################################
 ##### Non-parametric testing - Multinomial Regression
 ##################################################
-# Cochran Armitage to consider ordinal nature of additive model
 print("Starting Multinomial regression - Fisher's Test")
 
 df.mult <- df.nominal[df.nominal$method %in% "MultiLogReg", ]
@@ -170,73 +175,80 @@ uno.mult <- uno[uno$term %in% df.mult$term & uno$Pheno %in% df.mult$Pheno &
 df.mult <- rbind(ord.mult, uno.mult)
 
 fi.list <- list()
-for (i in 1:nrow(df.mult)) {
-  pheno <- df.mult[i, "Pheno"]
-  snp <- df.mult[i, "term"]
-  group <- df.mult[i, "y.level"]
-  # Filter groups of interest
-  df.test <- df.raw[, c(pheno, snp)]
-  ref_group <- min(unique(df.test[[pheno]]), na.rm = TRUE)
-  df.test <- df.test[df.test[[pheno]] %in% c(1, group), ]
-  # Table and test
-  table.contigency <- table(df.test[[pheno]], df.test[[snp]])
-  fi.test <- tryCatch({
-    broom::tidy(fisher.test(table.contigency))
-  }, error = function(e) {
-    data.frame(
-        estimate = NA,
-        p.value = NA,
-        conf.low = NA,
-        conf.high = NA,
-        method = "error", 
-        alternative = "error"
-    )
-  })
-  fi.test$Pheno <- pheno
-  fi.test$SNP <- snp
-  fi.test$Group <- group
-  fi.list[[i]] <- fi.test
+
+if (nrow(df.mult) > 0) {
+  for (i in 1:nrow(df.mult)) {
+    pheno <- df.mult[i, "Pheno"]
+    snp <- df.mult[i, "term"]
+    group <- df.mult[i, "y.level"]
+    # Filter groups of interest
+    df.test <- df.raw[, c(pheno, snp)]
+    ref_group <- min(unique(df.test[[pheno]]), na.rm = TRUE)
+    df.test <- df.test[df.test[[pheno]] %in% c(1, group), ]
+    # Table and test
+    table.contigency <- table(df.test[[pheno]], df.test[[snp]])
+    fi.test <- tryCatch({
+      broom::tidy(fisher.test(table.contigency))
+    }, error = function(e) {
+      data.frame(
+          estimate = NA,
+          p.value = NA,
+          conf.low = NA,
+          conf.high = NA,
+          method = "error", 
+          alternative = "error"
+      )
+    })
+    fi.test$Pheno <- pheno
+    fi.test$SNP <- snp
+    fi.test$Group <- group
+    fi.list[[i]] <- fi.test
+  }
+  df.mult.fi <- do.call(rbind, fi.list)
+  multinomial.confirmed <- df.mult.fi[df.mult.fi$p.value < 0.05, ]
+} else {
+  df.mult.fi <- data.frame()
+  multinomial.confirmed <- data.frame()
 }
-
-df.mult.fi <- do.call(rbind, fi.list)
-
-multinomial.confirmed <- df.mult.fi[df.mult.fi$p.value < 0.05, ]
 
 rm(fi.list, pheno, snp, fi.test, i, df.mult, table.contigency, df.test, group)
 
 ####################################################
 ##### Non-parametric testing - Ordinal Regression
 ##################################################
-# Jonckheere-Terpstra will be used to test trend with permutatios due to N > 100
 print("Starting Ordinal regression - Wilcoxon Rank Test")
 
 df.ord <- df.nominal[df.nominal$method %in% "OrdinalLogisticRegression", ]
 
 wt.list <- list()
-for (i in 1:nrow(df.ord)) {
-  pheno <- df.ord[i, "Pheno"]
-  snp <- df.ord[i, "term"]
-  formula <- as.formula(paste(pheno, "~", "as.factor(", snp, ")"))
-  wt.test <- tryCatch({
-    broom::tidy(wilcox.test(formula, na.action = na.omit, data = df.raw))
-    }, error = function(e) {
-        # Return dataframe with error
-        data.frame(
-            statistic = NA,
-            p.value = NA,
-            method = "error",
-            alternative = "error"
-        )
-    })
-  wt.test$Pheno <- pheno
-  wt.test$SNP <- snp
-  wt.test$Group <- "full"
-  wt.list[[i]] <- wt.test
+
+if (nrow(df.ord) > 0) {
+  for (i in 1:nrow(df.ord)) {
+    pheno <- df.ord[i, "Pheno"]
+    snp <- df.ord[i, "term"]
+    formula <- as.formula(paste(pheno, "~", "as.factor(", snp, ")"))
+    wt.test <- tryCatch({
+      broom::tidy(wilcox.test(formula, na.action = na.omit, data = df.raw))
+      }, error = function(e) {
+          # Return dataframe with error
+          data.frame(
+              statistic = NA,
+              p.value = NA,
+              method = "error",
+              alternative = "error"
+          )
+      })
+    wt.test$Pheno <- pheno
+    wt.test$SNP <- snp
+    wt.test$Group <- "full"
+    wt.list[[i]] <- wt.test
+  }
+  df.ord.wt <- do.call(rbind, wt.list)
+  ordinal.confirmed <- df.ord.wt[df.ord.wt$p.value < 0.05, ]
+} else {
+  df.ord.wt <- data.frame()
+  ordinal.confirmed <- data.frame()
 }
-
-df.ord.wt <- do.call(rbind, wt.list)
-
-ordinal.confirmed <- df.ord.wt[df.ord.wt$p.value < 0.05, ]
 
 rm(wt.list, pheno, i, snp, wt.test, df.ord)
 
