@@ -1,6 +1,5 @@
 ############ Filter sig results by Gao et all ##########################
 
-#### Bonferroni p.value correction
 ####### Packages #####################
 if(!require(data.table)) install.packages("data.table")
 if(!require(dplyr)) install.packages("dplyr")
@@ -63,6 +62,14 @@ n_snps <- neff_snp$Neff
 # p-value after correction
 pvalue <- 0.05/(n_traits * n_snps)
 
+#####################################################
+### Filter out non-converging models
+######################################################
+# Retain only results from models that converged (not applicable to cont)
+mult <- mult[mult$convergence %in% "YES", ]
+ordinal <- ordinal[ordinal$convergence %in% c("YES", 0), ]
+binary <- binary[binary$Convergence == TRUE, ]
+
 
 #####################################################
 ### Filter significant results
@@ -81,7 +88,7 @@ binary_trait_snp <- binary_sig_df[, c("term", "Pheno")]
 ordinal_trait_snp <- ordinal_sig_df[, c("term", "Pheno")]
 
 # Combine data
-list_df <- list(c(mult_trait_snp, cont_trait_snp, binary_trait_snp, ordinal_trait_snp))
+list_df <- list(mult_trait_snp, cont_trait_snp, binary_trait_snp, ordinal_trait_snp)
 trait_snp <- do.call(rbind, list_df)
 
 # Select SNPs out of covariates and SNPs
@@ -94,10 +101,14 @@ n.sig <- nrow(trait_snp)
 sig_snps <- length(unique(trait_snp$term))
 sig_traits <- length(unique(trait_snp$Pheno))
 
-
 #####################################################
-### Select traits and SNPs from significant results
+### Select SNP as predictor only from significant results
 ######################################################
+mult_sig_df <- mult_sig_df[mult_sig_df$term %in% rsids, ]
+cont_sig_df <- cont_sig_df[cont_sig_df$term %in% rsids, ]
+binary_sig_df <- binary_sig_df[binary_sig_df$term %in% rsids, ]
+ordinal_sig_df <- ordinal_sig_df[ordinal_sig_df$term %in% rsids, ]
+
 
 #############
 ## Save descriptive in text format

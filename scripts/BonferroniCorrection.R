@@ -50,6 +50,14 @@ n_snps <- snakemake@params[["n_snps"]]
 # p-value after correction
 pvalue <- 0.05/(n_traits * n_snps)
 
+#####################################################
+### Filter out non-converging models
+######################################################
+# Retain only results from models that converged (not applicable to cont)
+mult <- mult[mult$convergence %in% "YES", ]
+ordinal <- ordinal[ordinal$convergence %in% c("YES", 0), ]
+binary <- binary[binary$Convergence == TRUE, ]
+
 
 #####################################################
 ### Filter significant results
@@ -68,13 +76,10 @@ binary_trait_snp <- binary_sig_df[, c("term", "Pheno")]
 ordinal_trait_snp <- ordinal_sig_df[, c("term", "Pheno")]
 
 # Combine data
-list_df <- list(c(mult_trait_snp, cont_trait_snp, binary_trait_snp, ordinal_trait_snp))
+list_df <- list(mult_trait_snp, cont_trait_snp, binary_trait_snp, ordinal_trait_snp)
 trait_snp <- do.call(rbind, list_df)
 
-# Select SNPs out of covariates + SNPs
-cov <- unique(codebook[, "covariates"])
-cov <- unlist(strsplit(cov, ","))
-
+# Select SNPs out of covariates 
 rsids <- grep("^rs", trait_snp$term, value = TRUE)
 trait_snp <- trait_snp[trait_snp$term %in% rsids, ]
 
@@ -86,8 +91,12 @@ sig_traits <- length(unique(trait_snp$Pheno))
 
 
 #####################################################
-### Select traits and SNPs from significant results
+### Select SNP as predictor only from significant results
 ######################################################
+mult_sig_df <- mult_sig_df[mult_sig_df$term %in% rsids, ]
+cont_sig_df <- cont_sig_df[cont_sig_df$term %in% rsids, ]
+binary_sig_df <- binary_sig_df[binary_sig_df$term %in% rsids, ]
+ordinal_sig_df <- ordinal_sig_df[ordinal_sig_df$term %in% rsids, ]
 
 #############
 ## Save descriptive in text format
